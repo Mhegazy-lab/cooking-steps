@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<meta name="application-name" content="Cooking Steps" />
+<meta name="description" content="Glanceable step-by-step cooking with timers — built for your glasses in the kitchen." />
+<link rel="icon" type="image/png" href="icon-192.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<title>Cooking Steps</title>
+<style>
+  :root{
+    --bg:#160b06; --ink:#fff7ed; --muted:#a89a8a;
+    --org:#f97316; --org-soft:rgba(249,115,22,.14);
+    --card:#221009; --line:rgba(249,115,22,.3);
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html,body{height:100%; overflow:hidden}
+  body{
+    background:radial-gradient(120% 90% at 50% 0%, #3a1a08 0%, var(--bg) 65%);
+    color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    display:flex; align-items:center; justify-content:center; min-height:100dvh;
+    -webkit-font-smoothing:antialiased; -webkit-user-select:none; user-select:none;
+  }
+  .app{width:min(480px,100vw - 24px); height:100dvh; max-height:780px; display:flex; flex-direction:column; padding:16px 14px 12px}
+  header{flex:0 0 auto; text-align:center}
+  h1{font-size:19px; letter-spacing:.04em; color:var(--org)}
+  .sub{color:var(--muted); font-size:12px; margin-top:3px}
+  .view{flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:10px; margin-top:12px}
+  .view[hidden]{display:none}
+  .rgrid{flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:8px}
+  .rbtn{
+    position:relative; border:1px solid var(--line); border-radius:16px; padding:18px 14px;
+    background:var(--card); color:var(--ink); font-size:18px; font-weight:800; cursor:pointer; text-align:left;
+  }
+  .rbtn:active{transform:scale(.98)}
+  .rbtn small{display:block; font-size:12px; color:var(--muted); font-weight:600; margin-top:3px}
+  .rbtn.add{border-style:dashed; text-align:center; color:var(--org)}
+  .del{
+    position:absolute; top:8px; right:8px; width:30px; height:30px; border-radius:50%;
+    border:1px solid rgba(168,154,138,.4); background:transparent; color:var(--muted);
+    font-size:15px; cursor:pointer; line-height:1;
+  }
+  .stepnum{flex:0 0 auto; text-align:center; color:var(--muted); font-size:13px; letter-spacing:.16em; text-transform:uppercase}
+  .dots{color:var(--org); letter-spacing:.3em; font-size:12px; margin-top:4px}
+  .stepcard{
+    flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; align-items:center; justify-content:center; text-align:center;
+    border:1px solid var(--line); border-radius:20px; padding:22px 18px;
+    background:linear-gradient(160deg, rgba(249,115,22,.12), rgba(249,115,22,.03));
+  }
+  .stepcard p{font-size:24px; font-weight:800; line-height:1.45}
+  .timerrow{flex:0 0 auto; display:flex; justify-content:center}
+  #timerBtn{
+    border:1px solid var(--line); background:var(--org-soft); color:var(--org);
+    border-radius:14px; padding:14px 26px; font-size:18px; font-weight:900; cursor:pointer;
+    font-variant-numeric:tabular-nums;
+  }
+  #timerBtn:active{transform:scale(.96)}
+  #timerBtn.running{background:var(--org); color:#2a1002}
+  .navrow{flex:0 0 auto; display:flex; gap:8px}
+  .navbtn{
+    flex:1; border-radius:14px; padding:16px 4px; font-size:17px; font-weight:800; cursor:pointer;
+    border:1px solid var(--line); background:transparent; color:var(--ink);
+  }
+  .navbtn:active{transform:scale(.96)}
+  .navbtn:disabled{opacity:.3}
+  .exitbtn{
+    flex:0 0 auto; border:none; background:transparent; color:var(--muted);
+    font-size:14px; font-weight:700; cursor:pointer; padding:8px;
+  }
+  .form{flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:8px}
+  .form input, .form textarea{
+    border:1px solid rgba(168,154,138,.4); border-radius:12px; background:#1d0e07; color:var(--ink);
+    font-size:15px; padding:12px; font-family:inherit; -webkit-user-select:text; user-select:text;
+  }
+  .form textarea{flex:1 1 auto; min-height:0; resize:none; line-height:1.6}
+  .form .hintline{font-size:11.5px; color:var(--muted); line-height:1.5}
+  .formrow{display:flex; gap:8px}
+  .formrow .navbtn{flex:1}
+  button:focus-visible, input:focus-visible, textarea:focus-visible{outline:3px solid var(--org); outline-offset:2px}
+</style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>👨‍🍳 Cooking Steps</h1>
+      <div class="sub" id="hdrSub">Pick a recipe</div>
+    </header>
+
+    <section class="view" id="viewPicker">
+      <div class="rgrid" id="rgrid"></div>
+    </section>
+
+    <section class="view" id="viewStep" hidden>
+      <div class="stepnum"><span id="stepNum">Step 1 of 5</span><div class="dots" id="dots"></div></div>
+      <div class="stepcard"><p id="stepText"></p></div>
+      <div class="timerrow"><button id="timerBtn" data-focusable hidden></button></div>
+      <div class="navrow">
+        <button class="navbtn" id="prevBtn" data-focusable>◀ Prev</button>
+        <button class="navbtn" id="nextBtn" data-focusable>Next ▶</button>
+      </div>
+      <button class="exitbtn" id="exitBtn" data-focusable>✕ Exit recipe</button>
+    </section>
+
+    <section class="view" id="viewAdd" hidden>
+      <div class="form">
+        <input id="rName" maxlength="32" placeholder="Recipe name" autocomplete="off" />
+        <textarea id="rSteps" placeholder="One step per line.&#10;Start a line with ⏱5 for a 5-minute timer.&#10;&#10;Example:&#10;⏱10 Simmer the sauce&#10;Stir and serve"></textarea>
+        <div class="hintline">One step per line. Prefix a line with ⏱ and minutes (e.g. ⏱5) to attach a timer.</div>
+        <div class="formrow">
+          <button class="navbtn" id="saveRBtn" data-focusable>Save</button>
+          <button class="navbtn" id="cancelRBtn" data-focusable>Cancel</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+<script>
+(function(){
+"use strict";
+var KEY = "cooking-recipes-v1";
+function $(id){ return document.getElementById(id); }
+
+var BUILTINS = [
+  {name: "🍚 Perfect Rice", steps: [
+    {t: "Rinse 1 cup of rice until the water runs clear.", m: 0},
+    {t: "Combine rice, 2 cups water, 1 tsp salt and 1 tbsp oil in a pot.", m: 0},
+    {t: "Bring to a boil over high heat.", m: 0},
+    {t: "Cover, reduce to low and simmer.", m: 15},
+    {t: "Rest off the heat, still covered.", m: 5},
+    {t: "Fluff with a fork and serve.", m: 0}
+  ]},
+  {name: "🍝 Pasta", steps: [
+    {t: "Bring a large pot of well-salted water to a rolling boil.", m: 0},
+    {t: "Add the pasta and stir immediately so it doesn't stick.", m: 0},
+    {t: "Cook until al dente, stirring occasionally.", m: 9},
+    {t: "Reserve a cup of pasta water, then drain.", m: 0},
+    {t: "Toss with sauce plus a splash of pasta water. Serve hot.", m: 0}
+  ]},
+  {name: "🍳 Omelette", steps: [
+    {t: "Beat 3 eggs with salt, pepper and a splash of milk.", m: 0},
+    {t: "Melt butter in a pan over medium heat.", m: 0},
+    {t: "Pour in the eggs; push the edges toward the center as they set.", m: 2},
+    {t: "Add your filling, fold in half and slide onto a plate.", m: 0}
+  ]},
+  {name: "🥬 Molokhia", steps: [
+    {t: "Bring your chicken or beef stock to a gentle boil.", m: 0},
+    {t: "Add the minced molokhia and stir — never let it boil hard.", m: 5},
+    {t: "Fry crushed garlic and ground coriander in ghee until golden: the tasha.", m: 0},
+    {t: "Pour the sizzling tasha into the molokhia.", m: 0},
+    {t: "Simmer gently, uncovered.", m: 3},
+    {t: "Serve over rice with the meat on the side.", m: 0}
+  ]}
+];
+
+function loadCustom(){
+  try{
+    var a = JSON.parse(localStorage.getItem(KEY));
+    if(Array.isArray(a)) return a.filter(function(r){ return r && r.name && Array.isArray(r.steps); });
+  }catch(e){}
+  return [];
+}
+function saveCustom(a){ localStorage.setItem(KEY, JSON.stringify(a)); }
+function allRecipes(){ return BUILTINS.concat(loadCustom()); }
+
+var recipe = null, idx = 0;
+var timerId = null, timerLeft = 0;
+
+function show(id){
+  ["viewPicker","viewStep","viewAdd"].forEach(function(v){ $(v).hidden = v !== id; });
+}
+
+/* ---------- picker ---------- */
+function renderPicker(){
+  var g = $("rgrid"); g.innerHTML = "";
+  var customs = loadCustom();
+  allRecipes().forEach(function(r, i){
+    var b = document.createElement("button");
+    b.className = "rbtn"; b.setAttribute("data-focusable", "");
+    var nSteps = r.steps.length;
+    b.innerHTML = esc(r.name) + "<small>" + nSteps + " steps" +
+      (r.steps.some(function(s){ return s.m > 0; }) ? " · has timers" : "") + "</small>";
+    if(i >= BUILTINS.length){
+      var x = document.createElement("button");
+      x.className = "del"; x.textContent = "✕"; x.setAttribute("aria-label", "Delete recipe");
+      x.addEventListener("click", function(ev){
+        ev.stopPropagation();
+        var c2 = loadCustom(); c2.splice(i - BUILTINS.length, 1); saveCustom(c2); renderPicker();
+      });
+      b.appendChild(x);
+    }
+    b.addEventListener("click", function(){ startRecipe(r); });
+    g.appendChild(b);
+  });
+  var add = document.createElement("button");
+  add.className = "rbtn add"; add.setAttribute("data-focusable", "");
+  add.textContent = "＋ Add your own recipe";
+  add.addEventListener("click", function(){
+    $("rName").value = ""; $("rSteps").value = "";
+    $("hdrSub").textContent = "New recipe";
+    show("viewAdd"); $("rName").focus();
+  });
+  g.appendChild(add);
+  $("hdrSub").textContent = "Pick a recipe";
+}
+function esc(s){
+  return String(s).replace(/[&<>"]/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];
+  });
+}
+
+/* ---------- step view ---------- */
+function startRecipe(r){
+  recipe = r; idx = 0;
+  $("hdrSub").textContent = r.name;
+  show("viewStep");
+  renderStep();
+  $("nextBtn").focus();
+}
+function renderStep(){
+  stopTimer();
+  var s = recipe.steps[idx], n = recipe.steps.length;
+  $("stepNum").textContent = "Step " + (idx+1) + " of " + n;
+  var dots = "";
+  for(var i = 0; i < n; i++) dots += i === idx ? "●" : "○";
+  $("dots").textContent = dots;
+  $("stepText").textContent = s.t;
+  $("prevBtn").disabled = idx === 0;
+  $("nextBtn").textContent = idx === n-1 ? "✓ Done" : "Next ▶";
+  var tb = $("timerBtn");
+  if(s.m > 0){
+    tb.hidden = false;
+    tb.textContent = "⏱ Start " + s.m + ":00";
+    tb.classList.remove("running");
+    tb.onclick = startTimer;
+  }else tb.hidden = true;
+}
+$("prevBtn").addEventListener("click", function(){ if(idx > 0){ idx--; renderStep(); } });
+$("nextBtn").addEventListener("click", function(){
+  if(idx < recipe.steps.length - 1){ idx++; renderStep(); }
+  else{ show("viewPicker"); renderPicker(); }
+});
+$("exitBtn").addEventListener("click", function(){ stopTimer(); show("viewPicker"); renderPicker(); });
+document.addEventListener("keydown", function(e){
+  if($("viewStep").hidden) return;
+  if(e.key === "ArrowRight" && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); $("nextBtn").click(); }
+  if(e.key === "ArrowLeft" && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); $("prevBtn").click(); }
+});
+
+/* ---------- timer ---------- */
+var actx = null;
+function beep(){
+  try{
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    for(var i = 0; i < 3; i++){
+      (function(k){
+        var o = actx.createOscillator(), g = actx.createGain();
+        o.connect(g); g.connect(actx.destination);
+        o.frequency.value = 880; o.type = "sine";
+        var t0 = actx.currentTime + k*0.45;
+        g.gain.setValueAtTime(0.001, t0);
+        g.gain.exponentialRampToValueAtTime(0.5, t0 + 0.05);
+        g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.35);
+        o.start(t0); o.stop(t0 + 0.4);
+      })(i);
+    }
+  }catch(e){}
+}
+function fmtT(s){
+  return Math.floor(s/60) + ":" + String(s%60).padStart(2, "0");
+}
+function startTimer(){
+  var s = recipe.steps[idx];
+  timerLeft = s.m*60;
+  var tb = $("timerBtn");
+  tb.classList.add("running");
+  tb.textContent = "⏱ " + fmtT(timerLeft);
+  tb.onclick = stopTimerUI;
+  clearInterval(timerId);
+  timerId = setInterval(function(){
+    timerLeft--;
+    if(timerLeft <= 0){
+      stopTimer();
+      tb.classList.remove("running");
+      tb.textContent = "✓ Time's up!";
+      tb.onclick = startTimer;
+      beep();
+    }else tb.textContent = "⏱ " + fmtT(timerLeft);
+  }, 1000);
+}
+function stopTimer(){ clearInterval(timerId); timerId = null; }
+function stopTimerUI(){
+  stopTimer();
+  var tb = $("timerBtn"), s = recipe.steps[idx];
+  tb.classList.remove("running");
+  tb.textContent = "⏱ Start " + s.m + ":00";
+  tb.onclick = startTimer;
+}
+
+/* ---------- add recipe ---------- */
+$("saveRBtn").addEventListener("click", function(){
+  var name = $("rName").value.trim();
+  var lines = $("rSteps").value.split("\n").map(function(l){ return l.trim(); }).filter(Boolean);
+  if(!name || !lines.length){ $("rName").focus(); return; }
+  var steps = lines.map(function(l){
+    var m = l.match(/^⏱\s*(\d+)\s*(.*)$/);
+    if(m) return {t: m[2] || "Timer step", m: parseInt(m[1], 10)};
+    return {t: l, m: 0};
+  });
+  var c = loadCustom(); c.push({name: name, steps: steps}); saveCustom(c);
+  show("viewPicker"); renderPicker();
+});
+$("cancelRBtn").addEventListener("click", function(){ show("viewPicker"); renderPicker(); });
+
+renderPicker();
+})();
+</script>
+</body>
+</html>
