@@ -1,0 +1,1 @@
+{"version":1,"name":"Cooking Steps","description":"Glanceable step-by-step cooking with timers — built for your glasses in the kitchen.","appearance":{"theme_color":"#F97316","icon":{"src":"../icon-mono.png","type":"monochrome"},"icon_background":{"colors":["#F97316","#C2410C","#431407","#160B06"],"stops":[0.0,0.33,0.66,1.0],"inner_glow_color":"#FED7AA"}}}
